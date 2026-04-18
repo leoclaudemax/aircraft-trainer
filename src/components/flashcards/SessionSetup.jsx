@@ -15,8 +15,11 @@ export default function SessionSetup({ onStart, initial }) {
   const [mode, setMode] = useState('rec+perf'); // rec | rec+perf
   const [mixPairs, setMixPairs] = useState(true);
   const [difficulty, setDifficulty] = useState(settings.defaultDifficulty);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickedIds, setPickedIds] = useState([]); // when non-empty, overrides filters
 
   const toggle = (arr, v, set) => set(arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v]);
+  const togglePicked = (id) => setPickedIds(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
 
   // Quick launches
   const quickLaunch = (kind) => {
@@ -75,20 +78,20 @@ export default function SessionSetup({ onStart, initial }) {
   };
 
   const startCustom = () => {
-    const deck = buildSession({
-      tiers,
-      categories: categories.length ? categories : null,
-      size,
-      order,
-      mixConfusionPairs: mixPairs
-    }, state.progress, masteryById);
+    const usingPicker = pickedIds.length > 0;
+    const deck = buildSession(
+      usingPicker
+        ? { aircraftIds: pickedIds, size: Math.max(size, pickedIds.length), order, mixConfusionPairs: mixPairs }
+        : { tiers, categories: categories.length ? categories : null, size, order, mixConfusionPairs: mixPairs },
+      state.progress, masteryById
+    );
     if (!deck.length) {
       alert('No aircraft match the selected filters.');
       return;
     }
     onStart({
       deck,
-      label: 'Custom session',
+      label: usingPicker ? `Picked: ${pickedIds.length} aircraft` : 'Custom session',
       includePerformance: mode === 'rec+perf',
       examMode: difficulty === 'exam',
       timed: difficulty === 'exam',
@@ -147,6 +150,74 @@ export default function SessionSetup({ onStart, initial }) {
               <Chip key={c} active={categories.includes(c)} onClick={() => toggle(categories, c, setCategories)}>{c}</Chip>
             ))}
           </Group>
+
+          <div className="field">
+            <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+              <label>Pick exact aircraft (optional — overrides filters above)</label>
+              <div className="row gap-8">
+                {pickedIds.length > 0 && (
+                  <span className="badge badge-strong">{pickedIds.length} picked</span>
+                )}
+                <button className="btn btn-sm" onClick={() => setPickerOpen(o => !o)}>
+                  {pickerOpen ? 'Hide list' : 'Show list'}
+                </button>
+                {pickedIds.length > 0 && (
+                  <button className="btn btn-sm btn-ghost" onClick={() => setPickedIds([])}>Clear</button>
+                )}
+              </div>
+            </div>
+
+            {pickerOpen && (
+              <div className="card" style={{ marginTop: 8, maxHeight: 360, overflowY: 'auto', background: 'var(--bg-elev-2)' }}>
+                {[1, 2, 3].map(t => {
+                  const tierAircraft = aircraft.filter(a => a.tier === t);
+                  const allPicked = tierAircraft.every(a => pickedIds.includes(a.id));
+                  return (
+                    <div key={t} style={{ marginBottom: 16 }}>
+                      <div className="row" style={{ justifyContent: 'space-between', marginBottom: 6 }}>
+                        <h4 style={{ margin: 0 }}>Tier {t} <span className="muted" style={{ fontWeight: 400 }}>({tierAircraft.length})</span></h4>
+                        <button
+                          className="btn btn-sm btn-ghost"
+                          onClick={() => {
+                            if (allPicked) {
+                              setPickedIds(p => p.filter(id => !tierAircraft.find(a => a.id === id)));
+                            } else {
+                              setPickedIds(p => [...new Set([...p, ...tierAircraft.map(a => a.id)])]);
+                            }
+                          }}
+                        >
+                          {allPicked ? 'Unselect all' : 'Select all'}
+                        </button>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 4 }}>
+                        {tierAircraft.map(a => (
+                          <label
+                            key={a.id}
+                            className="row gap-8"
+                            style={{
+                              padding: '6px 10px',
+                              borderRadius: 6,
+                              cursor: 'pointer',
+                              background: pickedIds.includes(a.id) ? 'var(--accent-bg)' : 'transparent',
+                              fontSize: 14
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={pickedIds.includes(a.id)}
+                              onChange={() => togglePicked(a.id)}
+                              style={{ accentColor: 'var(--accent)' }}
+                            />
+                            <span>{a.name}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
 
           <div className="row gap-16" style={{ flexWrap: 'wrap' }}>
             <div className="field" style={{ minWidth: 160 }}>

@@ -1,10 +1,10 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-// base: './' makes the build work whether deployed at root or in a sub-path
-// (e.g. https://username.github.io/aircraft-trainer/).
-export default defineConfig({
+// Deployed at https://<user>.github.io/aircraft-trainer/ so assets must be
+// requested from /aircraft-trainer/. In dev (npm run dev) the base is '/'.
+export default defineConfig(({ command }) => ({
   plugins: [react()],
-  base: './',
+  base: command === 'build' ? '/aircraft-trainer/' : '/',
   server: { port: 5173, host: true }
-});
+}));
